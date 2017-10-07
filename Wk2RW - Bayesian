@@ -1,0 +1,1 @@
+df <- read.csv("C:\\Users\\onyxr\\Dropbox (Personal)\\School\\UW\\Data Mining\\Datasets\\DataCamp\\locations.csv")
