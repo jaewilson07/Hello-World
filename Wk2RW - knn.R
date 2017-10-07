@@ -18,4 +18,3 @@ signs_prob <- attr(signs_pred, "prob")
 head(signs_prob, 100)
 
 table(test_types, signs_pred)
-
