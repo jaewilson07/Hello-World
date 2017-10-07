@@ -1,9 +1,7 @@
-install.packages('RCurl')
 install.packages('naivebayes')
-require('RCurl')
 require('naivebayes')
 
-df <- read.csv(text=getURL("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/locations.csv"))
+df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/locations.csv")
 head(df,10)
 where9am <- subset(df, df$hour==9)
 where9am <- where9am[, c(4,7)]
