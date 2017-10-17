@@ -1,8 +1,10 @@
-#install.packages('tictoc')
-#install.packages('beepr')
-#install.packages('flexclust')
-#install.packages('corrplot')
-#install.packages('dendextend')
+---
+title: "CW"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 
 library(NbClust)
 library(tictoc)
@@ -14,38 +16,80 @@ library(ggplot2)
 
 wine <- read.csv("https://github.com/jaewilson07/Hello-World/raw/master/Data%20Mining%20Coursework/Whitewine.csv")
 
+```
 
-#convert Quality into an ordinal Factor
+## Explore and Format the imported Wine data
+Although the wine dataframe imported properly, the Quality variable is not an ordinal factor as described
+-- cast the Quality variable from INT to Factor
+
+Plot counts of wine grouped by Quality to explore the distribution of quality levels.
+-- only 7 out of 10 possible levels are (unevenly) represented in our dataset.
+-- Assuming that subjective taste quality can be used to distinguish clusters of chemical attributes, there should be at most 7, more likely 5 clusters in our dataset.
+
+
+```{r formatWine}
+#explore the wine dataframe
+str(wine)
+
+#Convert the Quality variable into an Ordinal Factor
 qual_levels <- c(1:10)
 wine$quality	<-factor(wine$quality, levels = qual_levels, ordered = TRUE)
+
+#view the distribution of Quality in the existing dataset
 ggplot(wine, aes(x = quality)) +
 	geom_bar()
+
+
+```
+
+## Find a recommendation for cluster sizes
+Use NbClust() function and it's 30 indices to find recommendations for number of clusters to use in the k-means algorithm.
+-- We'll set our limits for cluster size recommendations at 2 and 7 clusters because given our earlier assumption, there shouldn't be more than 7 clusters.
+-- To avoid leaking information about the outcme variable to our algorithm, we'll begin by first isolating the Quality variable from our dataset.
+-- Because our chemical property variables are measured on different scales (eg. the range of Acidity is 3.8 : 14.2 while the range of Chlorides is only .009 : .346); we'll scale each variable by taking x - center (the variable mean) / standard deviation of the variable to prevent one variable from more strongly affecting the k-means distancing algorithm.
+
+
+
+```{r clusterWine}
 
 #isolate the quality columns
 wine_quality <- wine$quality
 
-#create a function for scaling variables on a 0:1 scale
+#scale the data set
 wine_train <- wine[,-12]
 wine_train <- scale(wine_train)
 
 #find recommendation for best number of clusters
 tic()
-numClust_wine <- NbClust(wine_train, method = "kmeans", min.nc =  2, max.nc = 4)
+numClust_wine <- NbClust(wine_train, method = "kmeans", min.nc =  2, max.nc = 7)
 beep()
+#store duration of NBClust
 t_clust<- toc()
+t_clust
 
-#find the top two (by count) wine cluster recommendations
+#numClust_wine$Best.n[1,] stores a list of the number clusters recommended by each index
+#find the top two (mode) wine cluster recommendations
 topClust_Wine_Rec <- as.numeric(names(sort(-table(numClust_wine$Best.n[1,])))[1:2])
 topClust_Wine_Rec
 
+```
 
-print(paste("Run k-means using 10, the number of actual Quality groups.  Additionally run k-means with cluster sizes..."))
-print(topClust_Wine_Rec[1] )
+## runKmeans
+Use kmeans() function to calculate 3 cluster permutations inl 7 (number of Quality levels represented in data) and the two most frequently occuring cluster recommendations.
+```{r runKMeans}
+paste(
+	c("Run k-means using 7, the number of represented Quality groups.  Additionally run k-means with the following cluster sizes"
+		, topClust_Wine_Rec[1]
+		, topClust_Wine_Rec[2] ), collapse = ", ")
 
-k_wine_10 <- kmeans(wine_train, 10)
+k_wine_10 <- kmeans(wine_train, 7)
 k_wine_1 <- kmeans(wine_train, topClust_Wine_Rec[1])
 k_wine_2 <- kmeans(wine_train, topClust_Wine_Rec[2])
+```
 
+## Analyze results
+
+```{r analyze results}
 tbwine <- table(wine[,12])
 tb_ct_10 <- table(k_wine_10$cluster, wine[,12])
 tb_ct_1 <- table(k_wine_1$cluster, wine[,12])
@@ -54,6 +98,7 @@ tb_ct_2 <- table(k_wine_2$cluster, wine[,12])
 randIndex(tb_ct_10)
 randIndex(tb_ct_1)
 randIndex(tb_ct_2)
+```
 
 
 #hclust (agglomerative) single
@@ -127,4 +172,21 @@ plot(bestClust$Best)
 
 str(bestClust)
 
-print("hello world")
+
+
+```
+
+
+```{r}
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
