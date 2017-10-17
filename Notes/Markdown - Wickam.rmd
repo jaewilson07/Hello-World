@@ -22,3 +22,15 @@ smaller %>%
   ggplot(aes(carat)) + 
   geom_freqpoly(binwidth = 0.01)
 ```
+
+
+```
+print("hello world")
+```
+
+test|test
+tewst|test
+
+* list 1
+  * list 2
+  * list 3
