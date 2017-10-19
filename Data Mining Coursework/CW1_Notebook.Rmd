@@ -1,6 +1,6 @@
 ---
 title: "CW"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -26,6 +26,10 @@ Plot counts of wine grouped by Quality to explore the distribution of quality le
 -- only 7 out of 10 possible levels are (unevenly) represented in our dataset.
 -- Assuming that subjective taste quality can be used to distinguish clusters of chemical attributes, there should be at most 7, more likely 5 clusters in our dataset.
 
+-- To avoid leaking information about the outcme variable to our algorithm, we'll begin by first isolating the Quality variable from our dataset.
+-- Because our chemical property variables are measured on different scales (eg. the range of Acidity is 3.8 : 14.2 while the range of Chlorides is only .009 : .346); we'll scale each variable by taking x - center (the variable mean) / standard deviation of the variable to prevent one variable from more strongly affecting the k-means distancing algorithm.
+
+
 
 ```{r formatWine}
 #explore the wine dataframe
@@ -39,25 +43,22 @@ wine$quality	<-factor(wine$quality, levels = qual_levels, ordered = TRUE)
 ggplot(wine, aes(x = quality)) +
 	geom_bar()
 
+#isolate the quality columns
+wine_quality <- wine$quality
+
+#scale the data set
+wine_train <- wine[,-12]
+wine_train <- as.data.frame(scale(wine_train))
 
 ```
 
 ## Find a recommendation for cluster sizes
 Use NbClust() function and it's 30 indices to find recommendations for number of clusters to use in the k-means algorithm.
 -- We'll set our limits for cluster size recommendations at 2 and 7 clusters because given our earlier assumption, there shouldn't be more than 7 clusters.
--- To avoid leaking information about the outcme variable to our algorithm, we'll begin by first isolating the Quality variable from our dataset.
--- Because our chemical property variables are measured on different scales (eg. the range of Acidity is 3.8 : 14.2 while the range of Chlorides is only .009 : .346); we'll scale each variable by taking x - center (the variable mean) / standard deviation of the variable to prevent one variable from more strongly affecting the k-means distancing algorithm.
 
 
 
 ```{r clusterWine}
-
-#isolate the quality columns
-wine_quality <- wine$quality
-
-#scale the data set
-wine_train <- wine[,-12]
-wine_train <- scale(wine_train)
 
 #find recommendation for best number of clusters
 tic()
@@ -101,6 +102,12 @@ randIndex(tb_ct_2)
 ```
 
 
+## perform a Hierarchical Cluster using 3 different distancing methods
+We start our hierarchical clustering exercise by creating hclust models using single, complete and average distance methods.
+
+As expected, the plot of the dendrograms are less informative because there are so many clusters as the hclust() algorithm combines the 4000+ observations.  
+
+```{r hclust}
 #hclust (agglomerative) single
 hclust_sing <- hclust( dist(wine_train), method= "single")
 dend_sing <- as.dendrogram(hclust_sing)
@@ -117,6 +124,38 @@ plot(hclust_sing)
 plot(hclust_compl)
 plot(hclust_avg)
 
+
+```
+
+
+##Cut the dendogram tree
+Although k-means and hierarchical clustering are clearly different approaches to unsupervised categorization of data, we'll recycle the previously recommended cluster size of from the nbclust(kmeans) algorithm to cut our dendogram trees.
+```{r}
+#cut the dendrograms and bind them to the wine_train dataset
+wine_train$hclust_sing <- as.factor(
+    cutree(hclust_sing, k = topClust_Wine_Rec[2], order_clusters_as_data =  FALSE))
+
+wine_train$hclust_compl <- as.factor(
+    cutree(hclust_compl, k = topClust_Wine_Rec[2], order_clusters_as_data =  FALSE))
+
+wine_train$hclust_avg <- as.factor(
+    cutree(hclust_avg, k = topClust_Wine_Rec[2], order_clusters_as_data =  FALSE))
+
+str(wine_train)
+
+temp$hclust_sing <- temp1$
+  str(temp)
+length(temp)
+
+
+str(wine_train)
+cutclust_compl <- cutree(hclust_compl, k= 1:10)
+cutclust_avg <- cutree(hclust_avg, k= 1:10)
+
+plot(cutclust_sing)
+plot(cutclust_compl)
+plot(cutclust_avg)
+
 #create a list of dendgrams
 d <- dendlist(
 		single = dend_sing,
@@ -131,62 +170,12 @@ str(hclust_avg)
 
 str()
 h<- dendlist(hclust_avg)
-=======
-install.packages('XLConnect', dependencies =  TRUE) 
-require(XLConnect) # load XLConnect package 
-require(NbClust)
-
-wk = loadWorkbook("C:\\Users\\onyxr\\Dropbox (Personal)\\School\\UW\\Data Mining\\Data Mining Coursework\\whitewine.xlsx") 
-df = readWorksheet(wk, sheet="White Wine")
-
-#head(df)
-#str(df)
-
-#convert Quality into an ordinal Factor
-qual_levels <- c(1:10)
-df$quality	<-factor(df$quality, levels = qual_levels, ordered = TRUE)
-
-#split the wine dataset in half for training and test
-wine_train <- df[1:nrow(df)/2, ]
-wine_test <-  df[nrow(df)/2:nrow(df), ]
-
-#isolate the quality columns
-train_quality <- wine_train$quality
-test_quality <- wine_test$quality
-
-#create a function for scaling variables on a 0:1 scale
-min_max <- function(x) {
-		(x - min(x)) / ( max(x) - min(x))
-	}
-
-#apply min_max to each column of the data set
-for (i in 1:(ncol(wine_train)-1) ){ wine_train[i] <- min_max(wine_train[i]) }
-for (i in 1:(ncol(wine_test)-1) ){ wine_test[i] <- min_max(wine_test[i]) }
-
-for (i in 1:5 { 
-	bestClust[i] <- NbClust( sample(wine_train[1:11], 100, replace=FALSE), method = "kmeans", min.nc =  2, max.nc = 15)
-
-})
 
 plot(bestClust$Best)
 
 str(bestClust)
 
-
-
-```
-
-
-```{r}
+print("hello world")
 
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
