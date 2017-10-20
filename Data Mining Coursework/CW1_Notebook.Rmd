@@ -25,7 +25,7 @@ Although the wine dataframe imported properly, the Quality variable is not an or
 
 Plot counts of wine grouped by Quality to explore the distribution of quality levels.
 -- only 7 out of 10 possible levels are (unevenly) represented in our dataset.
--- Assuming that subjective taste quality can be used to distinguish clusters of chemical attributes, there should be at most 7, more likely 5 clusters in our dataset.
+-- Assuming that subjective taste quality can be used to distinguish c  lusters of chemical attributes, there should be at most 7, more likely 5 clusters in our dataset.
 
 -- To avoid leaking information about the outcme variable to our algorithm, we'll begin by first isolating the Quality variable from our dataset.
 -- Because our chemical property variables are measured on different scales (eg. the range of Acidity is 3.8 : 14.2 while the range of Chlorides is only .009 : .346); we'll scale each variable by taking x - center (the variable mean) / standard deviation of the variable to prevent one variable from more strongly affecting the k-means distancing algorithm.
@@ -77,7 +77,7 @@ topClust_Wine_Rec
 ```
 
 ## runKmeans
-Use kmeans() function to calculate 3 cluster permutations inl 7 (number of Quality levels represented in data) and the two most frequently occuring cluster recommendations.
+Use kmeans() function to calculate 3 cluster permutations: 7 (number of Quality levels represented in data) and the two most frequently occuring cluster recommendations.
 ```{r runKMeans}
 paste(
 	c("Run k-means using 7, the number of represented Quality groups.  Additionally run k-means with the following cluster sizes"
@@ -159,11 +159,6 @@ beep()
 tic_dend <-toc()
 #Discuss the produced results after using the coorplot function.
 
-h<- dendlist(hclust_avg)
-
-plot(bestClust$Best)
-
-str(bestClust)
 
 ```
 
