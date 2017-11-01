@@ -12,7 +12,7 @@ output: html_notebook
 
 
 library('neuralnet')
-  library('NeuralNetTools')
+library('NeuralNetTools')
 library(data.table)
 library(beepr)
 library(tidyverse)
