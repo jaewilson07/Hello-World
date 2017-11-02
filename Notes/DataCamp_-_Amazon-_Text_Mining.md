@@ -1,5 +1,7 @@
-R Notebook
+GetHired by Google
 ================
+Jae Wilson
+2017-11-02
 
 ``` r
 #install.packages("ggdendro")
@@ -164,13 +166,10 @@ wordcloud(
 ```
 
     ## Warning in wordcloud(freq = amzn_pro_freq, words = names(amzn_pro_freq), :
-    ## smart people could not be fit on page. It will not be plotted.
+    ## good pay could not be fit on page. It will not be plotted.
 
     ## Warning in wordcloud(freq = amzn_pro_freq, words = names(amzn_pro_freq), :
-    ## great benefits could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(freq = amzn_pro_freq, words = names(amzn_pro_freq), :
-    ## good benefits could not be fit on page. It will not be plotted.
+    ## work environment could not be fit on page. It will not be plotted.
 
 ![](DataCamp_-_Amazon-_Text_Mining_files/figure-markdown_github-ascii_identifiers/wordcloud-1.png)
 
@@ -349,24 +348,20 @@ comparison.cloud( goog_all_m,
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
-    ## max.words = 100): work environment could not be fit on page. It will not be
-    ## plotted.
-
-    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): great place could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
-    ## max.words = 100): great culture could not be fit on page. It will not be
+    ## max.words = 100): people work could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
+    ## max.words = 100): smart coworkers could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): working environment could not be fit on page. It will not
     ## be plotted.
-
-    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
-    ## max.words = 100): work smart could not be fit on page. It will not be
-    ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): benefits great could not be fit on page. It will not be
@@ -382,6 +377,10 @@ comparison.cloud( goog_all_m,
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): amazing benefits could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
+    ## max.words = 100): amazing people could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
@@ -409,11 +408,19 @@ comparison.cloud( goog_all_m,
     ## be plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
+    ## max.words = 100): lots perks could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): people good could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): perks amazing could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
+    ## max.words = 100): perks smart could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
@@ -425,11 +432,15 @@ comparison.cloud( goog_all_m,
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
-    ## max.words = 100): food smart could not be fit on page. It will not be
+    ## max.words = 100): get work could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): good atmosphere could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
+    ## max.words = 100): good work could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
@@ -438,6 +449,10 @@ comparison.cloud( goog_all_m,
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
     ## max.words = 100): opportunity work could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),
+    ## max.words = 100): perks food could not be fit on page. It will not be
     ## plotted.
 
     ## Warning in comparison.cloud(goog_all_m, colors = c("red", "blue"),

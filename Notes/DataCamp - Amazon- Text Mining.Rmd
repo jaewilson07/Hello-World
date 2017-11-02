@@ -1,5 +1,7 @@
 ---
-title: "R Notebook"
+title: "GetHired by Google"
+author: "Jae Wilson"
+date: "`r format(Sys.Date())`"
 output: github_document
 ---
 ```{r setup}
