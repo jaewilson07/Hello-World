@@ -313,7 +313,11 @@ comparison.cloud(all_tdm_m
   , max.words = 50)
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/compareCorpus-1.png) \#\#\#Polarized Cloud show top 25 words shared in each corpus show the absolute difference between words represented in each corpus (top should have the least difference in word representation) eg. Cup is common to both corpuses, but Chardonnay tweeters use cup MUCH MORE frequently than Coffee tweeters.
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/compareCorpus-1.png)
+
+### Polarized Cloud
+
+show top 25 words shared in each corpus show the absolute difference between words represented in each corpus (top should have the least difference in word representation) eg. Cup is common to both corpuses, but Chardonnay tweeters use cup MUCH MORE frequently than Coffee tweeters.
 
 ``` r
 # Create common_words
@@ -368,22 +372,15 @@ word_associate(coffee_tweets, match.string = c("barista"),
     ## 4 931   all  931 Barista made my coffee wrong and still gave me both anyway #Starbucks #coffee #caffeine #upallnight http://t.co/iKCNwO8F6t          
     ## 5 951   all  951 RT @FrankIero: hahaha @jamiasan :*gives Barista our Starbucks order* Barista: coffee? @jamiasan : yes, isn't this is a coffee store?
 
-    ## 
-    ## Match Terms
-    ## ===========
-
-    ## 
-    ## List 1:
-    ## baristakyo, barista, baristalife
-
-    ## 
-
 ``` r
 # Add title
 title(main = "Barista Coffee Tweet Associations")
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/wordAssociation-1.png) \#\#additional skills for improving text mining
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/wordAssociation%20-1.png)
+
+additional skills for improving text mining
+-------------------------------------------
 
 ### understanding hclusts and dendrograms
 
@@ -427,10 +424,10 @@ Limit the number of words in your TDM using removeSparseTerms() from tm.
 
 Why would you want to adjust the sparsity of the TDM/DTM? TDMs and DTMs are sparse, meaning they contain mostly zeros.
 
--   A good TDM has between 25 and 70 terms. \*
--   The lower the sparse value, the more terms are kept. The closer it is to 1, the fewer are kept.\*
+-   A good TDM has between 25 and 70 terms.
+-   The lower the sparse value, the more terms are kept. The closer it is to 1, the fewer are kept.
 
--   This value is a percentage cutoff of zeros for each term in the TDM.\*
+-   This value is a percentage cutoff of zeros for each term in the TDM.
 
 ``` r
 # Print the dimensions of tweets_tdm
