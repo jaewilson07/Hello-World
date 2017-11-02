@@ -10,6 +10,8 @@ output: github_document
 #install.packages("tm", dependencies = TRUE)
 #install.packages("wordcloud", dependencies = TRUE)
 #install.packages("plotrix", dependencies = TRUE)
+#install.packages("ggthemes", dependencies = TRUE)
+#install.packages("RWeka" , dependencies = TRUE)
 library(knitr)
 library(magrittr)
 
@@ -17,6 +19,11 @@ library(qdap) #Quantitative Discourse Analysis Packag
 library(tm) #text mining
 library("wordcloud")
 library("plotrix") #for pyramidcoud
+library("dendextend")
+library(ggplot2)
+library(ggthemes)
+library(RWeka)
+
 ```
 
 ##Generate a Simple Corpus
@@ -305,5 +312,122 @@ print(tdm1)
 print(tdm2)
 
 
+```
+
+```{r}
+# Create tweets_tdm2
+coffee_tdm2 <- removeSparseTerms(coffee_tdm, sparse= .975)
+
+# Create tdm_m
+coffee_m <-as.matrix(coffee_tdm2)
+
+# Create tdm_df
+coffee_df <- as.data.frame(coffee_m)
+
+# Create tweets_dist
+coffee_dist <- dist(coffee_df)
+
+# Create hc
+hc <- hclust(coffee_dist)
+
+plot(hc)
+```
+
+
+```{r hclustDendrogram}
+
+# Create hc
+coffee_hc<-hclust(coffee_dist)
+
+# Create hcd
+coffee_hcd <- as.dendrogram(coffee_hc)
+
+# Print the labels in hcd
+labels(coffee_hcd)
+
+# Change the branch color to red for "marvin" and "gaye"
+coffee_hcd<- branches_attr_by_labels(coffee_hcd, c("starbucks", "portland") , col="red")
+
+# Plot hcd
+plot(coffee_hcd)
+
+# Add cluster rectangles 
+rect.dendrogram(coffee_hcd, k=5, border ="grey50")
+```
+
+### using Associations to analyze data
+Use findAssocs() function in the tm package. 
+
+For any given word, findAssocs() calculates correlation with every other word in a TDM or DTM. 
+* Scores range from 0 to 1. 
+* Where 1 means that two words always appear together
+* Minimum correlation values are often relatively low because of word diversity. (0.10 could demonstrate a strong pairwise term association)
+
+```{r associations}
+
+# Create associations
+associations <- findAssocs(coffee_tdm, "venti", .2)
+
+# View the venti associations
+class(associations)
+print(associations)
+
+# Create associations_df
+associations_df <- list_vect2df(associations)[, 2:3]
+
+# Plot the associations_df values
+ggplot(associations_df, aes(y = associations_df[, 1])) + 
+  geom_point(aes(x = associations_df[, 2]), data = associations_df, size = 3) + 
+  theme_gdocs() +
+  labs(title = "Word Associations with \'Venti\'", x = "Correlation", y ="Assoc. Word")
+```
+
+##Tokenizer
+
+The default DTM is unigrams
+* can use tokeinzer to create bi / tri grams (w two or more words per token).
+* help extract useful phrases can lead to some additional insights
+* improved predictive attributes for a machine learning algorithm.
+
+Customized tokenizer() function can be passed into the TermDocumentMatrix or DocumentTermMatrix functions as an additional parameter
+* Note: creates significantly larger DTMs
+
+```{r tokenizer}
+# Make tokenizer function 
+tokenizer <- function(x) {
+  NGramTokenizer(x, Weka_control(min=2, max=2))
+}
+
+# Create unigram_dtm
+unigram_dtm <- DocumentTermMatrix(coffee_corpus_clean)
+
+# Create bigram_dtm
+bigram_dtm <- DocumentTermMatrix(coffee_corpus_clean, control = list(tokenize = tokenizer))
+
+# Examine unigram_dtm
+print(unigram_dtm)
+
+# Examine bigram_dtm
+print(bigram_dtm)
+
+# Create bigram_dtm_m
+bigram_dtm_m <- as.matrix(bigram_dtm)
+unigram_dtm_m <- as.matrix(unigram_dtm)
+
+# Create freq
+coffee_bi_freq <- colSums(bigram_dtm_m)
+coffee_un_freq <- colSums(unigram_dtm_m)
+
+# Create bi_words
+coffee_bi_words <- names(coffee_bi_freq)
+coffee_un_words <- names(coffee_un_freq)
+
+# Examine part of bi_words
+print(coffee_bi_words[2577:2587])
+
+# Plot a wordcloud
+par(mfrow=c(1,2))
+wordcloud(coffee_un_words, coffee_un_freq, max.words =30)
+wordcloud(coffee_bi_words, coffee_bi_freq, max.words= 30)
 ```
 
