@@ -1,0 +1,250 @@
+---
+title: "R Notebook"
+output: github_document
+---
+```{r setup}
+#install.packages("ggdendro")
+
+library(qdap)
+library(magrittr)
+library(RWeka)
+library(tm)
+library(wordcloud)
+library(ggdendro)
+library(ggplot2)
+library(tm)
+library("plotrix") #for pyramidcoud
+```
+
+
+```{r imortData}
+amzn_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/amzn.txt", stringsAsFactors =  FALSE)
+goog_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/goog.txt", stringsAsFactors =  FALSE)
+
+```
+
+```{r dataCleansingFunctions}
+
+qdap_clean <- function(x) {
+  x <- x %>%
+    replace_abbreviation() %>%
+    replace_contraction() %>%
+    replace_number() %>%
+    replace_ordinal() %>%
+    replace_symbol() %>%
+    tolower()
+  return(x)
+}
+
+stpwords <- c(stopwords("en"), "Google", "Amazon", "company")
+
+tm_clean <- function(corpus) {
+  corpus <- corpus %>%
+    tm_map(removePunctuation) %>%
+    tm_map(stripWhitespace) %>%
+    tm_map(removeWords, stpwords)
+  return(corpus)
+}
+
+tokenizer <- function(x) {
+  NGramTokenizer(x, Weka_control(min = 2, max = 2))
+}
+```
+
+```{r create corpus}
+# Create amzn_pros
+amzn_pro <- amzn_df$pros %>%
+  na.omit() %>%
+  qdap_clean()
+
+amzn_pro_corp <- VCorpus(VectorSource(amzn_pro)) %>%
+  na.omit() %>%
+  tm_clean()
+
+# Create amzn_cons
+amzn_con <- amzn_df$cons %>%
+  na.omit() %>%
+  qdap_clean()
+
+amzn_con_corp <- VCorpus(VectorSource(amzn_con)) %>%
+  na.omit() %>%
+  tm_clean()
+
+# Create goog_pros
+goog_pro <- goog_df$pros %>%
+  qdap_clean()
+
+goog_pro_amzn <- VCorpus(VectorSource(goog_pro)) %>%
+  tm_clean()
+
+# Create goog_cons
+goog_con <- goog_df$cons %>%
+  qdap_clean()
+
+goog_con_corp <- VCorpus(VectorSource(goog_con)) %>%
+  tm_clean()
+```
+
+```{r wordcloud}
+
+# Create amzn_p_tdm
+amzn_pro_tdm <- TermDocumentMatrix(amzn_pro_corp, control = list(tokenize = tokenizer))
+amzn_con_tdm <- TermDocumentMatrix(amzn_con_corp, control = list(tokenize = tokenizer))
+
+# Create amzn_p_tdm_m
+amzn_pro_tdm_m <- as.matrix(amzn_pro_tdm)
+amzn_con_tdm_m <- as.matrix(amzn_con_tdm)
+
+# Create amzn_p_freq
+amzn_pro_freq <- rowSums(amzn_pro_tdm_m)
+amzn_con_freq <- rowSums(amzn_con_tdm_m)
+
+# Plot a wordcloud using amzn_p_freq values
+wordcloud(
+  freq = amzn_pro_freq
+  , words = names(amzn_pro_freq)
+  , max.words= 25
+  , color = "blue")
+
+wordcloud(
+  freq = amzn_con_freq
+  , words = names(amzn_con_freq)
+  , max.words= 25
+  , color = "red")
+
+```
+
+```{r hclust}
+
+# Create amzn_c_tdm2 by removing sparse terms 
+amzn_c_tdm_sparse <- removeSparseTerms(amzn_con_tdm, sparse= .993)
+
+# Create hc as a cluster of distance values
+hc <- hclust(dist(amzn_c_tdm_sparse, method = "euclidean"), method = "complete")
+
+# Produce a plot of hc
+#hang -1 to plot labels at same hieght
+ggdendrogram(hc, rotate = TRUE) +
+  labs(title = "Cons at Amazon")
+```
+
+```{r WordAssociation}
+
+# Create term_frequency
+amzn_pro_freq <- sort(amzn_pro_freq, decreasing = TRUE)
+
+# Print the 5 most common terms
+amzn_pro_freq[1:5]
+
+# Find associations with fast paced
+findAssocs(amzn_pro_tdm, "fast paced", .2)
+```
+
+```{r comparison cloud}
+
+#collapse into one big ass string
+goog_pro_all <- paste(goog_pro, collapse = " ")
+goog_con_all <- paste(goog_con, collapse = " ")
+
+# combine tweets into a 2 element vector and convert to vector
+goog_all <- c(goog_pro_all , goog_con_all)
+
+# Create all_corpus
+goog_all_corpus <- VCorpus(VectorSource(goog_all)) %>%
+                             tm_clean()
+goog_all_tdm <- TermDocumentMatrix(goog_all_corpus, control = list(tokenize = tokenizer))
+colnames(goog_all_tdm) <- c("Goog_Pros", "Goog_Cons")
+
+goog_all_m <- as.matrix(goog_all_tdm)
+
+comparison.cloud( goog_all_m,
+  colors = c("red", "blue"),
+  max.words = 100 )
+```
+
+```{r GoogvAmznPos Revies}
+
+#collapse into one big ass string
+amzn_pro_all <- paste(amzn_pro, collapse = " ")
+amzn_con_all <- paste(amzn_con, collapse = " ")
+
+goog_pro_all <- paste(goog_pro, collapse = " ")
+goog_con_all <- paste(goog_con, collapse = " ")
+
+
+
+# combine tweets into a 2 element vector and convert to vector
+pro_all <- c(goog_pro_all , amzn_pro_all)
+con_all <- c(goog_con_all , amzn_con_all)
+
+# Create all_corpus
+pro_all_corpus <- VCorpus(VectorSource(pro_all)) %>%
+                             tm_clean()
+con_all_corpus <- VCorpus(VectorSource(con_all)) %>%
+                             tm_clean()
+
+
+pro_all_tdm <- TermDocumentMatrix(pro_all_corpus, control = list(tokenize = tokenizer))
+colnames(pro_all_tdm) <- c("Goog_Pros", "Amazon_Pros")
+pro_all_m <- as.matrix(pro_all_tdm)
+
+con_all_tdm <- TermDocumentMatrix(con_all_corpus, control = list(tokenize = tokenizer))
+colnames(con_all_tdm) <- c("Goog_Cons", "Amazon_Cons")
+con_all_m <- as.matrix(con_all_tdm)
+
+
+# Create common_words
+pro_all_common <- subset(pro_all_m, 
+  pro_all_m[, 1] > 0 & pro_all_m[,2] >0)
+
+con_all_common <- subset(con_all_m, 
+  con_all_m[, 1] > 0 & con_all_m[,2] >0)
+
+# Create and sort by difference
+difference <- abs(pro_all_common[,1] - pro_all_common[,2])
+pro_all_common <- cbind(pro_all_common, difference)
+pro_all_common[order(pro_all_common[,3], decreasing = TRUE), ]
+
+difference <- abs(con_all_common[,1] - con_all_common[,2])
+con_all_common <- cbind(con_all_common, difference)
+con_all_common[order(con_all_common[,3], decreasing = TRUE), ]
+rm(difference)
+
+
+# Create top15_df
+pro_all_top15_df <- data.frame(
+  x = pro_all_common[1:15, 1], 
+  y = pro_all_common[1:15, 2],
+  labels = rownames(pro_all_common[1:15,])
+)
+
+con_all_top15_df <- data.frame(
+  x = con_all_common[1:15, 1], 
+  y = con_all_common[1:15, 2],
+  labels = rownames(con_all_common[1:15,])
+)
+
+
+# Create the pyramid plot
+pyramid.plot(pro_all_top15_df$x, 
+             pro_all_top15_df$y, 
+             labels = pro_all_top15_df$labels
+             , gap = 3
+             , top.labels = c("Google Pros", "Pro Words", "Amazon Pros"), 
+             main = "Words in Common", unit = NULL)
+
+pyramid.plot(con_all_top15_df$x, 
+             con_all_top15_df$y, 
+             labels = con_all_top15_df$labels
+             , gap = 3
+             , top.labels = c("Google Cons", "Con Words", "Amazon Cons"), 
+             main = "Words in Common", unit = NULL)
+
+```
+
+```{r findassociations}
+#look for people who enjoy fast paced environments with plenty of time to grow and expand
+
+findAssocs(amzn_pro_tdm, "fast paced", 0.2)[[1]][1:15]
+```
+

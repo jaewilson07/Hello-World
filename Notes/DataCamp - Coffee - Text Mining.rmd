@@ -30,11 +30,11 @@ library(RWeka)
 ```{r simpleCorpus, message= FALSE}
 
 #import and isolate tweets
-coffee_tweets<- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/CoffeeTweets.txt", stringsAsFactors = FALSE)
-chardonnay_tweets <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/ChardonnayTweets.txt", stringsAsFactors = FALSE)
+coffee_tweets_df<- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/CoffeeTweets.txt", stringsAsFactors = FALSE)
+chardonnay_tweets_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/ChardonnayTweets.txt", stringsAsFactors = FALSE)
 
-coffee_tweets <- coffee_tweets$text
-chardonnay_tweets <- chardonnay_tweets$text
+coffee_tweets <- coffee_tweets_df$text
+chardonnay_tweets <- chardonnay_tweets_df$text
 
 #plot bag of words
 coffee_freq <- freq_terms(coffee_tweets, 10)
@@ -430,4 +430,52 @@ par(mfrow=c(1,2))
 wordcloud(coffee_un_words, coffee_un_freq, max.words =30)
 wordcloud(coffee_bi_words, coffee_bi_freq, max.words= 30)
 ```
+
+###Term Weights
+Frequently occuring words (like coffee, or chardonnay) may skew or hide insights.
+* change frequency weights to penalize words that occur too often
+*TfIdf (term frequency inverse document frequency) is a common Term Weight modifier.  Where TF increases with frequency and is diminished by appearing in all documents
+
+```{r TermWeights}
+
+# Create tf_tdm
+tf_tdm <- TermDocumentMatrix(coffee_corpus)
+
+# Create tfidf_tdm
+tfidf_tdm <- TermDocumentMatrix(coffee_corpus, control = list(weighting = weightTfIdf))
+
+# Create tf_tdm_m
+tf_tdm_m <- as.matrix(tf_tdm)
+
+# Create tfidf_tdm_m 
+tfidf_tdm_m <- as.matrix(tfidf_tdm)
+
+# Examine part of tf_tdm_m
+tf_tdm_m[508:509, 5:10]
+
+# Examine part of tfidf_tdm_m
+tfidf_tdm_m[508:509, 5:10]
+```
+
+```{r captureMetaData}
+# Add author to custom reading list
+custom_reader <- readTabular(mapping = list(content = "text", 
+                                            id = "num", 
+                                            author = "screenName", 
+                                            date = "created"))
+
+# Make corpus with custom reading
+text_corpus <- VCorpus( 
+  DataframeSource(coffee_tweets_df),
+  readerControl = list(reader = custom_reader)
+  )
+
+# Clean corpus
+text_corpus <- clean_corpus(text_corpus)
+
+# Print data
+print(text_corpus[[1]][1])
+print(text_corpus[[1]][2])
+```
+
 
