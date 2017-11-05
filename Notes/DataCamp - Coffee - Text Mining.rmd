@@ -24,90 +24,154 @@ library(ggplot2)
 library(ggthemes)
 library(RWeka)
 
+library(dplyr)
+library(tidytext)
+
 ```
 
-##Generate a Simple Corpus
-```{r simpleCorpus, message= FALSE}
+```{r udfFunctions}
 
+# create a custom reader for capturing metadata
+custom_reader <- readTabular(mapping = list(content = "text", 
+                                            id = "num", 
+                                            author = "screenName", 
+                                            date = "created"))
+
+#create a function to apply transformations
+#use content_transformer to inform tm_map that you'd like to 'transform content'
+#NOTE: when using cleansing functions from tm library no content_transformer required()
+clean_corpus_coffee <- function(corpus){
+  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, stopwordLibraryCoffee)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stemDocument, language = "english")
+  return(corpus)
+}
+
+clean_corpus_chardonnay <- function(corpus){
+  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, stopwordLibraryChardonnay)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stemDocument, language = "english")
+  return(corpus)
+}
+
+# Make tokenizer function 
+tokenizer <- function(x) {
+  NGramTokenizer(x, Weka_control(min=2, max=2))
+}
+```
+
+
+```{r importData}
+stopwordLibraryCoffee <- c(stopwords("en"), "coffee")
+stopwordLibraryChardonnay <- c(stopwords("en"), "chardonnay")
 #import and isolate tweets
 coffee_tweets_df<- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/CoffeeTweets.txt", stringsAsFactors = FALSE)
-chardonnay_tweets_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/ChardonnayTweets.txt", stringsAsFactors = FALSE)
+chardonnay_tweets_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/ChardonnayTweets.txt", stringsAsFactors = FALSE) %>%
+  rename( num = X)
+
+```
+
+```{r createVectorSourceCorpus}
 
 coffee_tweets <- coffee_tweets_df$text
 chardonnay_tweets <- chardonnay_tweets_df$text
 
-#plot bag of words
-coffee_freq <- freq_terms(coffee_tweets, 10)
-plot(coffee_freq)
-
 # Make a vector source (list): coffee_source
-coffee_source <- VectorSource(coffee_tweets)
-#NOTE:  DataframeSource() will convert entire row into ONE DOCUMENT
-#NOTE : VectorSource( df[,2:4]) will convert entire df$column into one document (combine all observations)
+coffee_vec_source <- VectorSource(coffee_tweets)
+coffee_vec_corpus <- VCorpus(coffee_vec_source)
 
-
-# Make a volatile corpus: coffee_corpus
-coffee_corpus <- VCorpus(coffee_source)
 
 # Print out coffee_corpus
-print(coffee_corpus)
-#Metadata:  corpus specific: 0, document level (indexed): 0
-#Content:  documents: 1000
+print(coffee_vec_corpus)
 
 # Print data on the 15th tweet in coffee_corpus
-print(coffee_corpus[[15]])
-#Metadata:  7
-#Content:  chars: 111
+print(coffee_vec_corpus[[15]])
 
 
 # Print the content of the 15th tweet in coffee_corpus
-print(coffee_corpus[[15]][1])
+print(coffee_vec_corpus[[15]][1])
 #"@HeatherWhaley I was about 2 joke it takes 2 hands to hold hot coffee...then I read headline! #Don'tDrinkNShoot"
+
+
+#NOTE:  DataframeSource() will convert entire row into ONE DOCUMENT (retain independent tweets structure)
+#NOTE : VectorSource(sample_df) will convert entire sample_df$data1 into one document (combine all variables)
+#sample_df <- data.frame( data1 = c("Apples and bananas" , "I think i need to drink coffee"),
+            # data2 = c( "Pears, plums and peaches", "This is how we suffer through bad classes, #Starbucks" )) %>%
+#  VectorSource()
+#print(sample_df)
 ```
 
-##process corpus
-Remove abbreviations, punctuation etc.
+```{r}
+# Make corpus which includes metadata by adding readerControl
+coffee_df_corpus <- VCorpus( 
+  DataframeSource(coffee_tweets_df),
+  readerControl = list(reader = custom_reader)) %>%
+  clean_corpus_coffee()
 
-```{r corpusClean}
+chardonnay_df_corpus <- VCorpus( 
+  DataframeSource(chardonnay_tweets_df),
+  readerControl = list(reader = custom_reader)) %>%
+  clean_corpus_chardonnay()
 
-#create a function to apply transformations
-clean_corpus <- function(corpus){
-  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, removeNumbers)
-  corpus <- tm_map(corpus, removeWords, c(stopwords("en"), "coffee"))
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  return(corpus)
-}
-coffee_corpus_clean <- clean_corpus(coffee_corpus)
-
-(coffee_dtm <- DocumentTermMatrix(coffee_corpus_clean))
-#DocumentTermMatrix (documents: 1000, terms: 3098)>>
-#Non-/sparse entries: 7772/3090228
-#Sparsity           : 100%
-#Maximal term length: 27
-#Weighting          : term frequency (tf)
-
-coffee_m <- as.matrix(coffee_dtm)
-dim(coffee_m) #there are 1000 documents and 3098 unique words in coffee_m
-
-(coffee_tdm <- TermDocumentMatrix(coffee_corpus_clean))
-coffee_m <- as.matrix(coffee_tdm)
-dim(coffee_m) #there are 1000 documents and 3098 unique words in coffee_m
-
-term_frequency <- rowSums(coffee_m) %>%
-	sort(decreasing = TRUE)
-barplot(term_frequency[1:10], col = "tan", las = 2)
+# Print data
+#str coffee_corpus
+# NOTE: syntax for selecting one liste item
+str(coffee_df_corpus[[1]])
+print(coffee_df_corpus[[1]][1])
+print(coffee_df_corpus[[1]][2])
+```
 
 
-qdapFreq <- freq_terms(
+```{r DTMsAndFrequencyPlots}
+
+##DTM vs TDM simply transposes the length / width of the resulting matrix
+(coffee_df_dtm <- DocumentTermMatrix(coffee_df_corpus))
+coffee_m_dtm <- as.matrix(coffee_df_dtm)
+
+(coffee_df_tdm <- TermDocumentMatrix(coffee_df_corpus))
+coffee_m_tdm <- as.matrix(coffee_df_tdm)
+
+chardonnay_df_tdm <-TermDocumentMatrix(chardonnay_df_corpus)
+chardonnay_m_tdm <- as.matrix(chardonnay_df_tdm)
+
+#there are 1000 documents and 3098 unique words in coffee_m
+dim(coffee_m_dtm) 
+dim(coffee_m_tdm) 
+
+
+#plot simple bag of words (frequency of each word)
+#using qdap library freq_terms()
+#NOTE: inclusion of uninformative words
+coffee_freq <- freq_terms(
+  coffee_tweets, 
+  top= 10)
+plot(coffee_freq)
+
+#NOTE: parameters to exclude Top200 stopwords as well words with fewer than 3 characters
+coffee_freq <- freq_terms(
 	coffee_tweets,
 	top = 10,
 	at.least = 3, #number of characters in vector
 	stopwords = "Top200Words")
-plot(qdapFreq)
+plot(coffee_freq)
 
-wordcloud(coffee_corpus_clean
+
+#alternatively, use rowSums() on the coffee DTM matrix to generate a summary matrix
+#NOTE: applcaition of sort() function on matrix
+#NOTE: using stowords("en") library + Coffee
+coffee_freq <- rowSums(coffee_m_tdm) %>%
+	sort(decreasing = TRUE)
+barplot(coffee_freq[1:10], col = "tan", las = 2)
+
+
+
+wordcloud(coffee_df_corpus
           , max.words = 100
           , random.order = TRUE
           ,  colors = c("grey80", "darkgoldenrod1",  "tomato")
@@ -145,8 +209,31 @@ comp_dict <- c("In", "a", "complicate", "haste", "Tom", "rush", "to", "fix", "a"
 #the stemCompletion is a complete list of all the 'valid' words
 complete_doc <-stemCompletion(stem_doc, comp_dict) 
 
+
 # Print complete_doc
 complete_doc
+
+
+#UNFINISHED ATTEMPT TO CREATE A VALID STEMCOMPLETION DOCUMENT
+#stem_coffee_corp <- tm_map(coffee_df_corpus, stemDocument, language = "en")
+#stem_coffee_m_tdm <- stem_coffee_corp %>%
+#  TermDocumentMatrix() %>%
+#  as.matrix()
+
+#all_coffee_words <- paste( rownames(coffee_m_tdm), collapse =  " " )
+#all_coffee_stem <- paste( rownames(stem_coffee_m_tdm), collapse = " " )
+# all_coffee_stem <- c(all_coffee_words, all_coffee_stem) %>%
+#   VectorSource() %>%
+#   VCorpus() %>%
+#   TermDocumentMatrix()
+# 
+# all_coffee_stem <- as.matrix(all_coffee_stem)
+# 
+# head(all_coffee_stem, 100)
+# 
+# stemmed_coffee <- subset(all_coffee_stem , all_coffee_stem[,1] == 0 & all_coffee_stem[,2] >0)
+# stemmed_coffee
+
 ```
 
 ##understanding color in visualization
@@ -163,58 +250,39 @@ purple_orange <- purple_orange[-(1:2)]
 
 ##Visualizing Corpus
 ### Combine Corpus
+Combine two corpus to see commonality
 ```{r combine Corpus}
 
-# Create all_coffee
 #collapse into one big ass string
-all_coffee <- paste(coffee_tweets, collapse = " ")
+all_coffee_words <- paste( rownames(coffee_m_tdm), collapse =  " " )
+
+#CODE VARIANT: using df, all_coffee_words <- paste(coffee_tweets, collapse = " ")
 
 # Create all_chardonnay
-all_chardonnay <- paste(chardonnay_tweets, collapse = " ")
+all_chardonnay_words <- paste( rownames(chardonnay_m_tdm), collapse = " " )
 
 # combine tweets into a 2 element vector
-all_tweets <- c(all_coffee, all_chardonnay)
+all_words <- c(all_coffee_words, all_chardonnay_words) %>%
+  VectorSource() %>%
+  VCorpus() %>%
+  clean_corpus_chardonnay()
 
-# Convert to a vector source  
-all_tweets <- VectorSource(all_tweets)
+all_tdm <- TermDocumentMatrix(all_words) %>%
+  `colnames<-` (c("coffee", "chardonnay"))
 
-# Create all_corpus
-all_corpus <- VCorpus(all_tweets)
-
-# Clean the corpus
-all_clean <- clean_corpus(all_corpus)
-
-# Create all_tdm
-all_tdm <- TermDocumentMatrix(all_clean)
-str(all_tdm)
-# Create all_m
-all_m <- as.matrix(all_tdm)
+all_m_tdm <- as.matrix(all_tdm)
 
 # Print a commonality cloud
-commonality.cloud(all_m
+commonality.cloud(all_m_tdm
   , colors = "steelblue1"
   , max.words = 100)
-```
 
-###Compare Corpus
-```{r compareCorpus}
 
-# Clean the corpus
-all_clean <- clean_corpus(all_corpus)
-
-# Create all_tdm
-all_tdm <- TermDocumentMatrix(all_clean)
-
-# Give the columns distinct names
-colnames(all_tdm) <- c("coffee", "chardonnay")
-
-# Create all_m
-all_tdm_m <- as.matrix(all_tdm)
-
-# Create comparison cloud
-comparison.cloud(all_tdm_m
+# print comparison cloud
+comparison.cloud(all_m_tdm
   , colors= c("orange", "blue")
   , max.words = 50)
+
 ```
 
 ###Polarized Cloud
@@ -223,28 +291,31 @@ show the absolute difference between words represented in each corpus (top shoul
 eg. Cup is common to both corpuses, but Chardonnay tweeters use cup MUCH MORE frequently than Coffee tweeters.
 
 ```{r PolarizedTagCloud}
-# Create common_words
-common_words <- subset(all_tdm_m, all_tdm_m[, 1] > 0 & all_tdm_m[, 2] > 0)
 
-# Create difference
-difference <- abs(common_words[, 1] - common_words[, 2])
+# Create common_words as the subset of words that exist in both columns (freq count >1)
+common_words_all <- subset(all_m_tdm, all_m_tdm[, 1] > 0 & all_m_tdm[, 2] > 0)
+
+# Create difference as the sub
+difference <- abs(common_words_all[, 1] - common_words_all[, 2])
 
 # Combine common_words and difference
-common_words <- cbind(common_words, difference)
+common_words_all <- cbind(common_words_all, difference)
+
+rm(difference)
 
 # Order the data frame from most differences to least
-common_words <- common_words[order(common_words[, 3], decreasing = TRUE), ]
+common_words_all <- common_words_all[order(common_words_all[, 3], decreasing = TRUE), ]
 
 # Create top25_df
-top25_df <- data.frame(x = common_words[1:25, 1], 
-                       y =common_words[1:25, 2], 
-                       labels = rownames(common_words[1:25, ]))
+top25_df <- data.frame(x = common_words_all[1:25, 1], 
+                       y =common_words_all[1:25, 2], 
+                       labels = rownames(common_words_all[1:25, ]))
 
 # Create the pyramid plot
 pyramid.plot(top25_df$x, top25_df$y 
   ,labels = top25_df$labels
   , top.labels = c("Chardonnay", "Words", "Coffee")
-  , gap = 20
+  , gap = 1
   , space= .3
   , main = "Words in Common"
   , raxlab = NULL
@@ -297,63 +368,41 @@ Why would you want to adjust the sparsity of the TDM/DTM?  TDMs and DTMs are spa
 
 ```{r sparsityInTM}
 # Print the dimensions of tweets_tdm
-dim(coffee_tdm)
+dim(coffee_df_tdm)
 
 # Create tdm1
-tdm1 <- removeSparseTerms(coffee_tdm, sparse = .965)
+coffee_sparse965 <- removeSparseTerms(coffee_df_tdm, sparse = .965) %>%
+    as.matrix()
 
-# Create tdm2
-tdm2 <- removeSparseTerms(coffee_tdm, sparse = .98)
-
-# Print tdm1
-print(tdm1)
-
-# Print tdm2
-print(tdm2)
-
-
-```
-
-```{r}
 # Create tweets_tdm2
-coffee_tdm2 <- removeSparseTerms(coffee_tdm, sparse= .975)
-
-# Create tdm_m
-coffee_m <-as.matrix(coffee_tdm2)
-
-# Create tdm_df
-coffee_df <- as.data.frame(coffee_m)
+coffee_sparse975 <- removeSparseTerms(coffee_df_tdm, sparse= .975) %>%
+  as.matrix()
 
 # Create tweets_dist
-coffee_dist <- dist(coffee_df)
+coffee_sparse_dist975 <- dist(as.data.frame(coffee_sparse975))
+coffee_sparse_dist965 <- dist(as.data.frame(coffee_sparse965))
 
 # Create hc
-hc <- hclust(coffee_dist)
+hc975 <- hclust(coffee_sparse_dist975)
+hc965 <- hclust(coffee_sparse_dist965)
 
-plot(hc)
-```
-
-
-```{r hclustDendrogram}
-
-# Create hc
-coffee_hc<-hclust(coffee_dist)
+plot(hc975)
+plot(hc965)
 
 # Create hcd
-coffee_hcd <- as.dendrogram(coffee_hc)
+hc965_dend <- as.dendrogram(hc965)
 
 # Print the labels in hcd
-labels(coffee_hcd)
+labels(hc965)
 
 # Change the branch color to red for "marvin" and "gaye"
-coffee_hcd<- branches_attr_by_labels(coffee_hcd, c("starbucks", "portland") , col="red")
+coffee_hcd<- branches_attr_by_labels(hc965_dend, c("starbuck", "portland") , col="red")
 
-# Plot hcd
+# Plot hcd with rectangles at k 5
 plot(coffee_hcd)
-
-# Add cluster rectangles 
 rect.dendrogram(coffee_hcd, k=5, border ="grey50")
 ```
+
 
 ### using Associations to analyze data
 Use findAssocs() function in the tm package. 
@@ -366,18 +415,18 @@ For any given word, findAssocs() calculates correlation with every other word in
 ```{r associations}
 
 # Create associations
-associations <- findAssocs(coffee_tdm, "venti", .2)
-
+coffee_assos <- findAssocs(coffee_df_tdm, "venti", .2)
+class(coffee_assos)
+print(coffee_assos)
 # View the venti associations
-class(associations)
-print(associations)
 
 # Create associations_df
-associations_df <- list_vect2df(associations)[, 2:3]
+coffee_assos_df <- list_vect2df(coffee_assos)[, 2:3] %>%
+  rename( correl = X3, word = X2)
 
 # Plot the associations_df values
-ggplot(associations_df, aes(y = associations_df[, 1])) + 
-  geom_point(aes(x = associations_df[, 2]), data = associations_df, size = 3) + 
+ggplot(coffee_assos_df, aes(x = correl, y = word)) + 
+  geom_point(size = 3) + 
   theme_gdocs() +
   labs(title = "Word Associations with \'Venti\'", x = "Correlation", y ="Assoc. Word")
 ```
@@ -393,42 +442,33 @@ Customized tokenizer() function can be passed into the TermDocumentMatrix or Doc
 * Note: creates significantly larger DTMs
 
 ```{r tokenizer}
-# Make tokenizer function 
-tokenizer <- function(x) {
-  NGramTokenizer(x, Weka_control(min=2, max=2))
-}
-
-# Create unigram_dtm
-unigram_dtm <- DocumentTermMatrix(coffee_corpus_clean)
 
 # Create bigram_dtm
-bigram_dtm <- DocumentTermMatrix(coffee_corpus_clean, control = list(tokenize = tokenizer))
+coffee_df_dtm_bigrm <- DocumentTermMatrix(coffee_df_corpus, control = list(tokenize = tokenizer))
 
 # Examine unigram_dtm
-print(unigram_dtm)
+print(coffee_df_dtm)
 
 # Examine bigram_dtm
-print(bigram_dtm)
+print(coffee_df_dtm_bigrm)
 
 # Create bigram_dtm_m
-bigram_dtm_m <- as.matrix(bigram_dtm)
-unigram_dtm_m <- as.matrix(unigram_dtm)
+coffee_df_m_dtm_bigrm <- as.matrix(coffee_df_dtm_bigrm)
 
 # Create freq
-coffee_bi_freq <- colSums(bigram_dtm_m)
-coffee_un_freq <- colSums(unigram_dtm_m)
+coffee_freq_bi <- colSums(coffee_df_m_dtm_bigrm)
 
 # Create bi_words
-coffee_bi_words <- names(coffee_bi_freq)
-coffee_un_words <- names(coffee_un_freq)
+coffee_bi_words <- names(coffee_freq_bi)
+coffee_un_words <- names(coffee_freq)
 
 # Examine part of bi_words
 print(coffee_bi_words[2577:2587])
 
 # Plot a wordcloud
 par(mfrow=c(1,2))
-wordcloud(coffee_un_words, coffee_un_freq, max.words =30)
-wordcloud(coffee_bi_words, coffee_bi_freq, max.words= 30)
+wordcloud(coffee_un_words, coffee_freq, max.words =30)
+wordcloud(coffee_bi_words, coffee_freq_bi, max.words= 30)
 ```
 
 ###Term Weights
@@ -438,44 +478,19 @@ Frequently occuring words (like coffee, or chardonnay) may skew or hide insights
 
 ```{r TermWeights}
 
-# Create tf_tdm
-tf_tdm <- TermDocumentMatrix(coffee_corpus)
-
 # Create tfidf_tdm
-tfidf_tdm <- TermDocumentMatrix(coffee_corpus, control = list(weighting = weightTfIdf))
-
-# Create tf_tdm_m
-tf_tdm_m <- as.matrix(tf_tdm)
+tfidf_tdm <- TermDocumentMatrix(coffee_df_corpus, control = list(weighting = weightTfIdf))
 
 # Create tfidf_tdm_m 
 tfidf_tdm_m <- as.matrix(tfidf_tdm)
 
 # Examine part of tf_tdm_m
-tf_tdm_m[508:509, 5:10]
+coffee_m_tdm[22, 5:60]
 
 # Examine part of tfidf_tdm_m
-tfidf_tdm_m[508:509, 5:10]
+tfidf_tdm_m[22, 5:60]
 ```
 
-```{r captureMetaData}
-# Add author to custom reading list
-custom_reader <- readTabular(mapping = list(content = "text", 
-                                            id = "num", 
-                                            author = "screenName", 
-                                            date = "created"))
 
-# Make corpus with custom reading
-text_corpus <- VCorpus( 
-  DataframeSource(coffee_tweets_df),
-  readerControl = list(reader = custom_reader)
-  )
-
-# Clean corpus
-text_corpus <- clean_corpus(text_corpus)
-
-# Print data
-print(text_corpus[[1]][1])
-print(text_corpus[[1]][2])
-```
 
 
