@@ -1,15 +1,19 @@
 Coffee - Text Analsyis
 ================
 Jae Wilson
-2017-11-02
+2017-11-09
+
+Setup
+=====
 
 ``` r
-#install.packages("qdap", dependencies = TRUE)
-#install.packages("tm", dependencies = TRUE)
-#install.packages("wordcloud", dependencies = TRUE)
-#install.packages("plotrix", dependencies = TRUE)
-#install.packages("ggthemes", dependencies = TRUE)
-#install.packages("RWeka" , dependencies = TRUE)
+# install.packages("qdap", dependencies = TRUE)
+# install.packages("tm", dependencies = TRUE)
+# install.packages("wordcloud", dependencies = TRUE)
+# install.packages("plotrix", dependencies = TRUE)
+# install.packages("ggthemes", dependencies = TRUE)
+# install.packages("RWeka" , dependencies = TRUE)
+
 library(knitr)
 library(magrittr)
 
@@ -21,38 +25,73 @@ library("dendextend")
 library(ggplot2)
 library(ggthemes)
 library(RWeka)
+
+library(dplyr)
+library(tidytext)
 ```
 
-Generate a Simple Corpus
-------------------------
+``` r
+# create a custom reader for capturing metadata
+custom_reader <- readTabular(mapping = list(content = "text", 
+                                            id = "num", 
+                                            author = "screenName", 
+                                            date = "created"))
+
+#create a function to apply transformations
+#use content_transformer to inform tm_map that you'd like to 'transform content'
+#NOTE: when using cleansing functions from tm library no content_transformer required()
+clean_corpus_coffee <- function(corpus){
+  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, stopwordLibraryCoffee)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stemDocument, language = "english")
+  return(corpus)
+}
+
+clean_corpus_chardonnay <- function(corpus){
+  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, stopwordLibraryChardonnay)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stemDocument, language = "english")
+  return(corpus)
+}
+
+# Make tokenizer function 
+tokenizer <- function(x) {
+  NGramTokenizer(x, Weka_control(min=2, max=2))
+}
+```
 
 ``` r
+stopwordLibraryCoffee <- c(stopwords("en"), "coffee")
+stopwordLibraryChardonnay <- c(stopwords("en"), "chardonnay")
 #import and isolate tweets
-coffee_tweets<- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/CoffeeTweets.txt", stringsAsFactors = FALSE)
-chardonnay_tweets <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/ChardonnayTweets.txt", stringsAsFactors = FALSE)
-
-coffee_tweets <- coffee_tweets$text
-chardonnay_tweets <- chardonnay_tweets$text
-
-#plot bag of words
-coffee_freq <- freq_terms(coffee_tweets, 10)
-plot(coffee_freq)
+coffee_tweets_df<- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/CoffeeTweets.txt", stringsAsFactors = FALSE)
+chardonnay_tweets_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/Hello-World/master/Datasets/DataCamp/ChardonnayTweets.txt", stringsAsFactors = FALSE) %>%
+  rename( num = X)
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/simpleCorpus-1.png)
+Bag of Words
+============
+
+Define Corpuses
+---------------
 
 ``` r
+coffee_tweets <- coffee_tweets_df$text
+chardonnay_tweets <- chardonnay_tweets_df$text
+
 # Make a vector source (list): coffee_source
-coffee_source <- VectorSource(coffee_tweets)
-#NOTE:  DataframeSource() will convert entire row into ONE DOCUMENT
-#NOTE : VectorSource( df[,2:4]) will convert entire df$column into one document (combine all observations)
+coffee_vec_source <- VectorSource(coffee_tweets)
+coffee_vec_corpus <- VCorpus(coffee_vec_source)
 
-
-# Make a volatile corpus: coffee_corpus
-coffee_corpus <- VCorpus(coffee_source)
 
 # Print out coffee_corpus
-print(coffee_corpus)
+print(coffee_vec_corpus)
 ```
 
     ## <<VCorpus>>
@@ -60,11 +99,8 @@ print(coffee_corpus)
     ## Content:  documents: 1000
 
 ``` r
-#Metadata:  corpus specific: 0, document level (indexed): 0
-#Content:  documents: 1000
-
 # Print data on the 15th tweet in coffee_corpus
-print(coffee_corpus[[15]])
+print(coffee_vec_corpus[[15]])
 ```
 
     ## <<PlainTextDocument>>
@@ -72,12 +108,8 @@ print(coffee_corpus[[15]])
     ## Content:  chars: 111
 
 ``` r
-#Metadata:  7
-#Content:  chars: 111
-
-
 # Print the content of the 15th tweet in coffee_corpus
-print(coffee_corpus[[15]][1])
+print(coffee_vec_corpus[[15]][1])
 ```
 
     ## $content
@@ -85,92 +117,149 @@ print(coffee_corpus[[15]][1])
 
 ``` r
 #"@HeatherWhaley I was about 2 joke it takes 2 hands to hold hot coffee...then I read headline! #Don'tDrinkNShoot"
+
+
+#NOTE:  DataframeSource() will convert entire row into ONE DOCUMENT (retain independent tweets structure)
+#NOTE : VectorSource(sample_df) will convert entire sample_df$data1 into one document (combine all variables)
+#sample_df <- data.frame( data1 = c("Apples and bananas" , "I think i need to drink coffee"),
+            # data2 = c( "Pears, plums and peaches", "This is how we suffer through bad classes, #Starbucks" )) %>%
+#  VectorSource()
+#print(sample_df)
 ```
-
-process corpus
---------------
-
-Remove abbreviations, punctuation etc.
 
 ``` r
-#create a function to apply transformations
-clean_corpus <- function(corpus){
-  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, removeNumbers)
-  corpus <- tm_map(corpus, removeWords, c(stopwords("en"), "coffee"))
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  return(corpus)
-}
-coffee_corpus_clean <- clean_corpus(coffee_corpus)
+# Make corpus which includes metadata by adding readerControl
+coffee_df_corpus <- VCorpus( 
+  DataframeSource(coffee_tweets_df),
+  readerControl = list(reader = custom_reader)) %>%
+  clean_corpus_coffee()
 
-(coffee_dtm <- DocumentTermMatrix(coffee_corpus_clean))
+chardonnay_df_corpus <- VCorpus( 
+  DataframeSource(chardonnay_tweets_df),
+  readerControl = list(reader = custom_reader)) %>%
+  clean_corpus_chardonnay()
+
+# Print data
+#str coffee_corpus
+# NOTE: syntax for selecting one liste item
+str(coffee_df_corpus[[1]])
 ```
 
-    ## <<DocumentTermMatrix (documents: 1000, terms: 3098)>>
-    ## Non-/sparse entries: 7772/3090228
+    ## List of 2
+    ##  $ content: chr "ayyytylerb true drink lot"
+    ##  $ meta   :List of 4
+    ##   ..$ id      : chr "1"
+    ##   ..$ author  : chr "thejennagibson"
+    ##   ..$ date    : chr "8/9/2013 2:43"
+    ##   ..$ language: chr "en"
+    ##   ..- attr(*, "class")= chr "TextDocumentMeta"
+    ##  - attr(*, "class")= chr [1:2] "PlainTextDocument" "TextDocument"
+
+``` r
+print(coffee_df_corpus[[1]][1])
+```
+
+    ## $content
+    ## [1] "ayyytylerb true drink lot"
+
+``` r
+print(coffee_df_corpus[[1]][2])
+```
+
+    ## $meta
+    ##   id      : 1
+    ##   author  : thejennagibson
+    ##   date    : 8/9/2013 2:43
+    ##   language: en
+
+DTMs and Frequencies
+--------------------
+
+``` r
+##DTM vs TDM simply transposes the length / width of the resulting matrix
+(coffee_df_dtm <- DocumentTermMatrix(coffee_df_corpus))
+```
+
+    ## <<DocumentTermMatrix (documents: 1000, terms: 2798)>>
+    ## Non-/sparse entries: 7728/2790272
     ## Sparsity           : 100%
     ## Maximal term length: 27
     ## Weighting          : term frequency (tf)
 
 ``` r
-#DocumentTermMatrix (documents: 1000, terms: 3098)>>
-#Non-/sparse entries: 7772/3090228
-#Sparsity           : 100%
-#Maximal term length: 27
-#Weighting          : term frequency (tf)
+coffee_m_dtm <- as.matrix(coffee_df_dtm)
 
-coffee_m <- as.matrix(coffee_dtm)
-dim(coffee_m) #there are 1000 documents and 3098 unique words in coffee_m
+(coffee_df_tdm <- TermDocumentMatrix(coffee_df_corpus))
 ```
 
-    ## [1] 1000 3098
-
-``` r
-(coffee_tdm <- TermDocumentMatrix(coffee_corpus_clean))
-```
-
-    ## <<TermDocumentMatrix (terms: 3098, documents: 1000)>>
-    ## Non-/sparse entries: 7772/3090228
+    ## <<TermDocumentMatrix (terms: 2798, documents: 1000)>>
+    ## Non-/sparse entries: 7728/2790272
     ## Sparsity           : 100%
     ## Maximal term length: 27
     ## Weighting          : term frequency (tf)
 
 ``` r
-coffee_m <- as.matrix(coffee_tdm)
-dim(coffee_m) #there are 1000 documents and 3098 unique words in coffee_m
+coffee_m_tdm <- as.matrix(coffee_df_tdm)
+
+chardonnay_df_tdm <-TermDocumentMatrix(chardonnay_df_corpus)
+chardonnay_m_tdm <- as.matrix(chardonnay_df_tdm)
+
+#there are 1000 documents and 3098 unique words in coffee_m
+dim(coffee_m_dtm) 
 ```
 
-    ## [1] 3098 1000
+    ## [1] 1000 2798
 
 ``` r
-term_frequency <- rowSums(coffee_m) %>%
-    sort(decreasing = TRUE)
-barplot(term_frequency[1:10], col = "tan", las = 2)
+dim(coffee_m_tdm) 
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/corpusClean-1.png)
+    ## [1] 2798 1000
 
 ``` r
-qdapFreq <- freq_terms(
+#plot simple bag of words (frequency of each word)
+#using qdap library freq_terms()
+#NOTE: inclusion of uninformative words
+coffee_freq <- freq_terms(
+  coffee_tweets, 
+  top= 10)
+plot(coffee_freq)
+```
+
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/DTMsAndFrequencyPlots-1.png)
+
+``` r
+#NOTE: parameters to exclude Top200 stopwords as well words with fewer than 3 characters
+coffee_freq <- freq_terms(
     coffee_tweets,
     top = 10,
     at.least = 3, #number of characters in vector
     stopwords = "Top200Words")
-plot(qdapFreq)
+plot(coffee_freq)
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/corpusClean-2.png)
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/DTMsAndFrequencyPlots-2.png)
 
 ``` r
-wordcloud(coffee_corpus_clean
+#alternatively, use rowSums() on the coffee DTM matrix to generate a summary matrix
+#NOTE: applcaition of sort() function on matrix
+#NOTE: using stowords("en") library + Coffee
+coffee_freq <- rowSums(coffee_m_tdm) %>%
+    sort(decreasing = TRUE)
+barplot(coffee_freq[1:10], col = "tan", las = 2)
+```
+
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/DTMsAndFrequencyPlots-3.png)
+
+``` r
+wordcloud(coffee_df_corpus
           , max.words = 100
           , random.order = TRUE
           ,  colors = c("grey80", "darkgoldenrod1",  "tomato")
           )
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/corpusClean-3.png)
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/DTMsAndFrequencyPlots-4.png)
 
 Stem Completion
 ---------------
@@ -215,6 +304,7 @@ comp_dict <- c("In", "a", "complicate", "haste", "Tom", "rush", "to", "fix", "a"
 #the stemCompletion is a complete list of all the 'valid' words
 complete_doc <-stemCompletion(stem_doc, comp_dict) 
 
+
 # Print complete_doc
 complete_doc
 ```
@@ -225,6 +315,28 @@ complete_doc
     ##       "rush"         "to"        "fix"          "a"        "new" 
     ##      complic          too      complic 
     ## "complicate"        "too" "complicate"
+
+``` r
+#UNFINISHED ATTEMPT TO CREATE A VALID STEMCOMPLETION DOCUMENT
+#stem_coffee_corp <- tm_map(coffee_df_corpus, stemDocument, language = "en")
+#stem_coffee_m_tdm <- stem_coffee_corp %>%
+#  TermDocumentMatrix() %>%
+#  as.matrix()
+
+#all_coffee_words <- paste( rownames(coffee_m_tdm), collapse =  " " )
+#all_coffee_stem <- paste( rownames(stem_coffee_m_tdm), collapse = " " )
+# all_coffee_stem <- c(all_coffee_words, all_coffee_stem) %>%
+#   VectorSource() %>%
+#   VCorpus() %>%
+#   TermDocumentMatrix()
+# 
+# all_coffee_stem <- as.matrix(all_coffee_stem)
+# 
+# head(all_coffee_stem, 100)
+# 
+# stemmed_coffee <- subset(all_coffee_stem , all_coffee_stem[,1] == 0 & all_coffee_stem[,2] >0)
+# stemmed_coffee
+```
 
 understanding color in visualization
 ------------------------------------
@@ -249,105 +361,413 @@ Visualizing Corpus
 
 ### Combine Corpus
 
+Combine two corpus to see commonality
+
 ``` r
-# Create all_coffee
 #collapse into one big ass string
-all_coffee <- paste(coffee_tweets, collapse = " ")
+all_coffee_words <- paste( rownames(coffee_m_tdm), collapse =  " " )
+
+#CODE VARIANT: using df, all_coffee_words <- paste(coffee_tweets, collapse = " ")
 
 # Create all_chardonnay
-all_chardonnay <- paste(chardonnay_tweets, collapse = " ")
+all_chardonnay_words <- paste( rownames(chardonnay_m_tdm), collapse = " " )
 
 # combine tweets into a 2 element vector
-all_tweets <- c(all_coffee, all_chardonnay)
+all_words <- c(all_coffee_words, all_chardonnay_words) %>%
+  VectorSource() %>%
+  VCorpus() %>%
+  clean_corpus_chardonnay()
 
-# Convert to a vector source  
-all_tweets <- VectorSource(all_tweets)
+all_tdm <- TermDocumentMatrix(all_words) %>%
+  `colnames<-` (c("coffee", "chardonnay"))
 
-# Create all_corpus
-all_corpus <- VCorpus(all_tweets)
-
-# Clean the corpus
-all_clean <- clean_corpus(all_corpus)
-
-# Create all_tdm
-all_tdm <- TermDocumentMatrix(all_clean)
-str(all_tdm)
-```
-
-    ## List of 6
-    ##  $ i       : int [1:6212] 2 3 4 5 6 7 8 9 11 15 ...
-    ##  $ j       : int [1:6212] 1 1 1 1 1 1 1 1 1 1 ...
-    ##  $ v       : num [1:6212] 1 1 1 1 1 1 1 1 1 1 ...
-    ##  $ nrow    : int 5491
-    ##  $ ncol    : int 2
-    ##  $ dimnames:List of 2
-    ##   ..$ Terms: chr [1:5491] "aaliyahmaxwell" "abasc" "abbslovesfed" "abbycastro" ...
-    ##   ..$ Docs : chr [1:2] "1" "2"
-    ##  - attr(*, "class")= chr [1:2] "TermDocumentMatrix" "simple_triplet_matrix"
-    ##  - attr(*, "weighting")= chr [1:2] "term frequency" "tf"
-
-``` r
-# Create all_m
-all_m <- as.matrix(all_tdm)
+all_m_tdm <- as.matrix(all_tdm)
 
 # Print a commonality cloud
-commonality.cloud(all_m
+commonality.cloud(all_m_tdm
   , colors = "steelblue1"
   , max.words = 100)
 ```
 
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : queen could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : suggest could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : area could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : order could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : beat could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : outrag could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : hous could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : sing could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : babe could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : vanilla could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : jamaican could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : award could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : stop could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : name could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : dick could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : sea could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : funni could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : shop could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : vodka could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : store could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : serv could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : money could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : price could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : sleep could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : london could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : cant could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : look could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : word could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : hand could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : turn could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : said could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : snack could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : bread could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : mean could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : havent could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : less could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : problem could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : three could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : hurt could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : weather could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : fave could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : though could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : pizza could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : nick could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : gonna could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : extrem could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : smell could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : season could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : need could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : lay could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : wait could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : bottl could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : gwyneth could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : drank could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : ear could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : delici could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : fam could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : fall could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : histori could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : jerri could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : eat could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : chocol could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : unfilt could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : show could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : settl could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : free could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : press could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : fantast could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : coast could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : thought could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : hell could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : gay could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : one could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : togeth could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : two could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : grill could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : box could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(rownames(term.matrix)[freq > 0], freq[freq > 0],
+    ## min.freq = 0, : white could not be fit on page. It will not be plotted.
+
 ![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/combine%20Corpus-1.png)
 
-### Compare Corpus
-
 ``` r
-# Clean the corpus
-all_clean <- clean_corpus(all_corpus)
-
-# Create all_tdm
-all_tdm <- TermDocumentMatrix(all_clean)
-
-# Give the columns distinct names
-colnames(all_tdm) <- c("coffee", "chardonnay")
-
-# Create all_m
-all_tdm_m <- as.matrix(all_tdm)
-
-# Create comparison cloud
-comparison.cloud(all_tdm_m
+# print comparison cloud
+comparison.cloud(all_m_tdm
   , colors= c("orange", "blue")
   , max.words = 50)
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/compareCorpus-1.png)
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): countrybreakfast could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): freshjuic could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): heritag could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): httptcomllymjztx could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): httptcoralvjtpl could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): httptcoxukjfdqvj could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): httptcozyyrotxyvi could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): huhu could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): hytetu could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): ilysm could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): lorenzoperkin could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): loveyourwork could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): megan could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): mibw could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): mocca could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): ninethreeseven could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): pastri could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): peanut could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): picoftheday could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): porcini could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): screw could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): sohot could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): starbuckscard could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): stlbiz could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): sweepstak could not be fit on page. It will not be
+    ## plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): tattoo could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): tough could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): umberto could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): umm could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): yesssss could not be fit on page. It will not be plotted.
+
+    ## Warning in comparison.cloud(all_m_tdm, colors = c("orange", "blue"),
+    ## max.words = 50): yestogod could not be fit on page. It will not be plotted.
+
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/combine%20Corpus-2.png)
 
 ### Polarized Cloud
 
 show top 25 words shared in each corpus show the absolute difference between words represented in each corpus (top should have the least difference in word representation) eg. Cup is common to both corpuses, but Chardonnay tweeters use cup MUCH MORE frequently than Coffee tweeters.
 
 ``` r
-# Create common_words
-common_words <- subset(all_tdm_m, all_tdm_m[, 1] > 0 & all_tdm_m[, 2] > 0)
+# Create common_words as the subset of words that exist in both columns (freq count >1)
+common_words_all <- subset(all_m_tdm, all_m_tdm[, 1] > 0 & all_m_tdm[, 2] > 0)
 
-# Create difference
-difference <- abs(common_words[, 1] - common_words[, 2])
+# Create difference as the sub
+difference <- abs(common_words_all[, 1] - common_words_all[, 2])
 
 # Combine common_words and difference
-common_words <- cbind(common_words, difference)
+common_words_all <- cbind(common_words_all, difference)
+
+rm(difference)
 
 # Order the data frame from most differences to least
-common_words <- common_words[order(common_words[, 3], decreasing = TRUE), ]
+common_words_all <- common_words_all[order(common_words_all[, 3], decreasing = TRUE), ]
 
 # Create top25_df
-top25_df <- data.frame(x = common_words[1:25, 1], 
-                       y =common_words[1:25, 2], 
-                       labels = rownames(common_words[1:25, ]))
+top25_df <- data.frame(x = common_words_all[1:25, 1], 
+                       y =common_words_all[1:25, 2], 
+                       labels = rownames(common_words_all[1:25, ]))
 
 # Create the pyramid plot
 pyramid.plot(top25_df$x, top25_df$y 
   ,labels = top25_df$labels
   , top.labels = c("Chardonnay", "Words", "Coffee")
-  , gap = 20
+  , gap = 1
   , space= .3
   , main = "Words in Common"
   , raxlab = NULL
@@ -359,6 +779,8 @@ pyramid.plot(top25_df$x, top25_df$y
 ![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/PolarizedTagCloud-1.png)
 
     ## [1] 5.1 4.1 4.1 2.1
+
+### Word Associations
 
 ``` r
 # Word association
@@ -386,9 +808,10 @@ title(main = "Barista Coffee Tweet Associations")
 ![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/wordAssociation%20-1.png)
 
 additional skills for improving text mining
--------------------------------------------
+===========================================
 
-### understanding hclusts and dendrograms
+understanding hclusts and dendrograms
+-------------------------------------
 
 ``` r
 rain <- data.frame( "city" = as.factor(c("Portland", "Cleveland", "Boston", "New Orleans"))
@@ -424,7 +847,8 @@ plot(hc, labels = rain$city)
 
 ![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/hclust-1.png)
 
-### Cleaning up dendrograms by reducing Sparsity
+Cleaning up dendrograms by reducing Sparsity
+--------------------------------------------
 
 Limit the number of words in your TDM using removeSparseTerms() from tm.
 
@@ -437,95 +861,66 @@ Why would you want to adjust the sparsity of the TDM/DTM? TDMs and DTMs are spar
 
 ``` r
 # Print the dimensions of tweets_tdm
-dim(coffee_tdm)
+dim(coffee_df_tdm)
 ```
 
-    ## [1] 3098 1000
+    ## [1] 2798 1000
 
 ``` r
 # Create tdm1
-tdm1 <- removeSparseTerms(coffee_tdm, sparse = .965)
+coffee_sparse965 <- removeSparseTerms(coffee_df_tdm, sparse = .965) %>%
+    as.matrix()
 
-# Create tdm2
-tdm2 <- removeSparseTerms(coffee_tdm, sparse = .98)
-
-# Print tdm1
-print(tdm1)
-```
-
-    ## <<TermDocumentMatrix (terms: 27, documents: 1000)>>
-    ## Non-/sparse entries: 1408/25592
-    ## Sparsity           : 95%
-    ## Maximal term length: 13
-    ## Weighting          : term frequency (tf)
-
-``` r
-# Print tdm2
-print(tdm2)
-```
-
-    ## <<TermDocumentMatrix (terms: 50, documents: 1000)>>
-    ## Non-/sparse entries: 2060/47940
-    ## Sparsity           : 96%
-    ## Maximal term length: 13
-    ## Weighting          : term frequency (tf)
-
-``` r
 # Create tweets_tdm2
-coffee_tdm2 <- removeSparseTerms(coffee_tdm, sparse= .975)
-
-# Create tdm_m
-coffee_m <-as.matrix(coffee_tdm2)
-
-# Create tdm_df
-coffee_df <- as.data.frame(coffee_m)
+coffee_sparse975 <- removeSparseTerms(coffee_df_tdm, sparse= .975) %>%
+  as.matrix()
 
 # Create tweets_dist
-coffee_dist <- dist(coffee_df)
+coffee_sparse_dist975 <- dist(as.data.frame(coffee_sparse975))
+coffee_sparse_dist965 <- dist(as.data.frame(coffee_sparse965))
 
 # Create hc
-hc <- hclust(coffee_dist)
+hc975 <- hclust(coffee_sparse_dist975)
+hc965 <- hclust(coffee_sparse_dist965)
 
-plot(hc)
+plot(hc975)
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-1-1.png)
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/sparsityInTM-1.png)
 
 ``` r
-# Create hc
-coffee_hc<-hclust(coffee_dist)
-
-# Create hcd
-coffee_hcd <- as.dendrogram(coffee_hc)
-
-# Print the labels in hcd
-labels(coffee_hcd)
+plot(hc965)
 ```
 
-    ##  [1] "coffee"        "cup"           "like"          "shop"         
-    ##  [5] "looks"         "show"          "hgtv"          "renovation"   
-    ##  [9] "charlie"       "hosting"       "working"       "portland"     
-    ## [13] "movethesticks" "whitehurst"    "just"          "get"          
-    ## [17] "good"          "morning"       "want"          "tea"          
-    ## [21] "drinking"      "starbucks"     "think"         "iced"         
-    ## [25] "half"          "chemicals"     "cancer"        "tested"       
-    ## [29] "single"        "there"         "need"          "ice"          
-    ## [33] "much"          "amp"           "now"           "right"        
-    ## [37] "can"           "the"           "love"          "make"         
-    ## [41] "dont"          "drink"
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/sparsityInTM-2.png)
+
+``` r
+# Create hcd
+hc965_dend <- as.dendrogram(hc965)
+
+# Print the labels in hcd
+labels(hc965)
+```
+
+    ##  [1] "coffe"        "cup"          "like"         "shop"        
+    ##  [5] "work"         "look"         "show"         "hgtv"        
+    ##  [9] "renov"        "portland"     "movethestick" "whitehurst"  
+    ## [13] "charli"       "host"         "drink"        "get"         
+    ## [17] "just"         "morn"         "make"         "love"        
+    ## [21] "good"         "caus"         "think"        "can"         
+    ## [25] "starbuck"     "amp"          "now"          "ice"         
+    ## [29] "want"
 
 ``` r
 # Change the branch color to red for "marvin" and "gaye"
-coffee_hcd<- branches_attr_by_labels(coffee_hcd, c("starbucks", "portland") , col="red")
+coffee_hcd<- branches_attr_by_labels(hc965_dend, c("starbuck", "portland") , col="red")
 
-# Plot hcd
+# Plot hcd with rectangles at k 5
 plot(coffee_hcd)
-
-# Add cluster rectangles 
 rect.dendrogram(coffee_hcd, k=5, border ="grey50")
 ```
 
-![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/hclustDendrogram-1.png)
+![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/sparsityInTM-3.png)
 
 ### using Associations to analyze data
 
@@ -535,33 +930,34 @@ For any given word, findAssocs() calculates correlation with every other word in
 
 ``` r
 # Create associations
-associations <- findAssocs(coffee_tdm, "venti", .2)
-
-# View the venti associations
-class(associations)
+coffee_assos <- findAssocs(coffee_df_tdm, "venti", .2)
+class(coffee_assos)
 ```
 
     ## [1] "list"
 
 ``` r
-print(associations)
+print(coffee_assos)
 ```
 
     ## $venti
-    ##     breve   drizzle    entire     pumps     extra       cuz    forget 
-    ##      0.58      0.58      0.58      0.58      0.47      0.41      0.41 
-    ##      okay     hyper     mocha   vanilla       wtf    always    asleep 
-    ##      0.41      0.33      0.33      0.33      0.29      0.26      0.26 
-    ##       get starbucks     white 
-    ##      0.25      0.25      0.23
+    ##    breve   drizzl    entir    extra      cuz   forget     okay     pump 
+    ##     0.58     0.58     0.58     0.47     0.41     0.41     0.41     0.41 
+    ##    hyper    mocha  vanilla      wtf    alway   asleep starbuck      get 
+    ##     0.33     0.33     0.33     0.29     0.26     0.26     0.25     0.24 
+    ##    white 
+    ##     0.23
 
 ``` r
+# View the venti associations
+
 # Create associations_df
-associations_df <- list_vect2df(associations)[, 2:3]
+coffee_assos_df <- list_vect2df(coffee_assos)[, 2:3] %>%
+  rename( correl = X3, word = X2)
 
 # Plot the associations_df values
-ggplot(associations_df, aes(y = associations_df[, 1])) + 
-  geom_point(aes(x = associations_df[, 2]), data = associations_df, size = 3) + 
+ggplot(coffee_assos_df, aes(x = correl, y = word)) + 
+  geom_point(size = 3) + 
   theme_gdocs() +
   labs(title = "Word Associations with \'Venti\'", x = "Correlation", y ="Assoc. Word")
 ```
@@ -576,122 +972,176 @@ The default DTM is unigrams \* can use tokeinzer to create bi / tri grams (w two
 Customized tokenizer() function can be passed into the TermDocumentMatrix or DocumentTermMatrix functions as an additional parameter \* Note: creates significantly larger DTMs
 
 ``` r
-# Make tokenizer function 
-tokenizer <- function(x) {
-  NGramTokenizer(x, Weka_control(min=2, max=2))
-}
-
-# Create unigram_dtm
-unigram_dtm <- DocumentTermMatrix(coffee_corpus_clean)
-
 # Create bigram_dtm
-bigram_dtm <- DocumentTermMatrix(coffee_corpus_clean, control = list(tokenize = tokenizer))
+coffee_df_dtm_bigrm <- DocumentTermMatrix(coffee_df_corpus, control = list(tokenize = tokenizer))
 
 # Examine unigram_dtm
-print(unigram_dtm)
+print(coffee_df_dtm)
 ```
 
-    ## <<DocumentTermMatrix (documents: 1000, terms: 3098)>>
-    ## Non-/sparse entries: 7772/3090228
+    ## <<DocumentTermMatrix (documents: 1000, terms: 2798)>>
+    ## Non-/sparse entries: 7728/2790272
     ## Sparsity           : 100%
     ## Maximal term length: 27
     ## Weighting          : term frequency (tf)
 
 ``` r
 # Examine bigram_dtm
-print(bigram_dtm)
+print(coffee_df_dtm_bigrm)
 ```
 
-    ## <<DocumentTermMatrix (documents: 1000, terms: 6015)>>
-    ## Non-/sparse entries: 8081/6006919
+    ## <<DocumentTermMatrix (documents: 1000, terms: 5967)>>
+    ## Non-/sparse entries: 8081/5958919
     ## Sparsity           : 100%
     ## Maximal term length: 40
     ## Weighting          : term frequency (tf)
 
 ``` r
 # Create bigram_dtm_m
-bigram_dtm_m <- as.matrix(bigram_dtm)
-unigram_dtm_m <- as.matrix(unigram_dtm)
+coffee_df_m_dtm_bigrm <- as.matrix(coffee_df_dtm_bigrm)
 
 # Create freq
-coffee_bi_freq <- colSums(bigram_dtm_m)
-coffee_un_freq <- colSums(unigram_dtm_m)
+coffee_freq_bi <- colSums(coffee_df_m_dtm_bigrm)
 
 # Create bi_words
-coffee_bi_words <- names(coffee_bi_freq)
-coffee_un_words <- names(coffee_un_freq)
+coffee_bi_words <- names(coffee_freq_bi)
+coffee_un_words <- names(coffee_freq)
 
 # Examine part of bi_words
 print(coffee_bi_words[2577:2587])
 ```
 
-    ##  [1] "i word"              "i work"              "i worked"           
-    ##  [4] "i wouldnt"           "iacc right"          "iambeyer im"        
-    ##  [7] "iamnate no"          "icamagpantay coffee" "ice cream"          
-    ## [10] "ice cube"            "ice good"
+    ##  [1] "ice israel" "ice kinda"  "ice milk"   "ice month"  "ice morn"  
+    ##  [6] "ice much"   "ice night"  "ice oh"     "ice omfg"   "ice room"  
+    ## [11] "ice shoot"
 
 ``` r
 # Plot a wordcloud
 par(mfrow=c(1,2))
-wordcloud(coffee_un_words, coffee_un_freq, max.words =30)
-wordcloud(coffee_bi_words, coffee_bi_freq, max.words= 30)
+wordcloud(coffee_un_words, coffee_freq, max.words =30)
+wordcloud(coffee_bi_words, coffee_freq_bi, max.words= 30)
 ```
 
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): like
-    ## working could not be fit on page. It will not be plotted.
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): rt
+    ## movethestick could not be fit on page. It will not be plotted.
 
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## renovation show could not be fit on page. It will not be plotted.
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): work
+    ## shop could not be fit on page. It will not be plotted.
 
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): rt
-    ## movethesticks could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): of
-    ## tested could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## there chemicals could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## movethesticks charlie could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## right now could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## tested half could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): ice
-    ## cream could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): cup
-    ## of could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## portland hosting could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## chemicals single could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## charlie whitehurst could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## hosting renovation could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): i
-    ## want could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): i
-    ## dont could not be fit on page. It will not be plotted.
-
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30): shop
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): shop
     ## portland could not be fit on page. It will not be plotted.
 
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## whitehurst looks could not be fit on page. It will not be plotted.
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): like
+    ## work could not be fit on page. It will not be plotted.
 
-    ## Warning in wordcloud(coffee_bi_words, coffee_bi_freq, max.words = 30):
-    ## working shop could not be fit on page. It will not be plotted.
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## uberfact there could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## whitehurst look could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): half
+    ## caus could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## portland host could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): cup
+    ## of could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## movethestick charli could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## chemic singl could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): look
+    ## like could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): rt
+    ## uberfact could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## charli whitehurst could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30): host
+    ## renov could not be fit on page. It will not be plotted.
+
+    ## Warning in wordcloud(coffee_bi_words, coffee_freq_bi, max.words = 30):
+    ## renov show could not be fit on page. It will not be plotted.
 
 ![](DataCamp_-_Coffee_-_Text_Mining_files/figure-markdown_github-ascii_identifiers/tokenizer-1.png)
+
+### Term Weights
+
+Frequently occuring words (like coffee, or chardonnay) may skew or hide insights. \* change frequency weights to penalize words that occur too often \*TfIdf (term frequency inverse document frequency) is a common Term Weight modifier. Where TF increases with frequency and is diminished by appearing in all documents
+
+``` r
+# Create tfidf_tdm
+tfidf_tdm <- TermDocumentMatrix(coffee_df_corpus, control = list(weighting = weightTfIdf))
+
+# Create tfidf_tdm_m 
+tfidf_tdm_m <- as.matrix(tfidf_tdm)
+
+# Examine part of tf_tdm_m
+coffee_m_tdm[22, 5:60]
+```
+
+    ##  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 
+    ##  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 
+    ## 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 
+    ##  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 
+    ## 55 56 57 58 59 60 
+    ##  0  0  0  0  0  0
+
+``` r
+# Examine part of tfidf_tdm_m
+tfidf_tdm_m[22, 5:60]
+```
+
+    ##  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 
+    ##  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 
+    ## 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 
+    ##  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 
+    ## 55 56 57 58 59 60 
+    ##  0  0  0  0  0  0
+
+``` r
+# Choose the bing lexicon
+get_sentiments("bing")
+```
+
+    ## # A tibble: 6,788 x 2
+    ##           word sentiment
+    ##          <chr>     <chr>
+    ##  1     2-faced  negative
+    ##  2     2-faces  negative
+    ##  3          a+  positive
+    ##  4    abnormal  negative
+    ##  5     abolish  negative
+    ##  6  abominable  negative
+    ##  7  abominably  negative
+    ##  8   abominate  negative
+    ##  9 abomination  negative
+    ## 10       abort  negative
+    ## # ... with 6,778 more rows
+
+``` r
+# Choose the nrc lexicon
+get_sentiments("nrc") %>%
+  count(sentiment) # Count words by sentiment
+```
+
+    ## # A tibble: 10 x 2
+    ##       sentiment     n
+    ##           <chr> <int>
+    ##  1        anger  1247
+    ##  2 anticipation   839
+    ##  3      disgust  1058
+    ##  4         fear  1476
+    ##  5          joy   689
+    ##  6     negative  3324
+    ##  7     positive  2312
+    ##  8      sadness  1191
+    ##  9     surprise   534
+    ## 10        trust  1231

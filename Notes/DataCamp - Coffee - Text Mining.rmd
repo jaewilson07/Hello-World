@@ -5,13 +5,15 @@ date: "`r format(Sys.Date())`"
 output: github_document
 ---
 
+#Setup
 ```{r Setup , message = FALSE }
-#install.packages("qdap", dependencies = TRUE)
-#install.packages("tm", dependencies = TRUE)
-#install.packages("wordcloud", dependencies = TRUE)
-#install.packages("plotrix", dependencies = TRUE)
-#install.packages("ggthemes", dependencies = TRUE)
-#install.packages("RWeka" , dependencies = TRUE)
+# install.packages("qdap", dependencies = TRUE)
+# install.packages("tm", dependencies = TRUE)
+# install.packages("wordcloud", dependencies = TRUE)
+# install.packages("plotrix", dependencies = TRUE)
+# install.packages("ggthemes", dependencies = TRUE)
+# install.packages("RWeka" , dependencies = TRUE)
+
 library(knitr)
 library(magrittr)
 
@@ -28,6 +30,7 @@ library(dplyr)
 library(tidytext)
 
 ```
+
 
 ```{r udfFunctions}
 
@@ -77,6 +80,9 @@ chardonnay_tweets_df <- read.csv("https://raw.githubusercontent.com/jaewilson07/
 
 ```
 
+#Bag of Words
+
+##Define Corpuses
 ```{r createVectorSourceCorpus}
 
 coffee_tweets <- coffee_tweets_df$text
@@ -107,7 +113,7 @@ print(coffee_vec_corpus[[15]][1])
 #print(sample_df)
 ```
 
-```{r}
+```{r DataFrameCorpus}
 # Make corpus which includes metadata by adding readerControl
 coffee_df_corpus <- VCorpus( 
   DataframeSource(coffee_tweets_df),
@@ -127,7 +133,7 @@ print(coffee_df_corpus[[1]][1])
 print(coffee_df_corpus[[1]][2])
 ```
 
-
+##DTMs and Frequencies
 ```{r DTMsAndFrequencyPlots}
 
 ##DTM vs TDM simply transposes the length / width of the resulting matrix
@@ -236,6 +242,7 @@ complete_doc
 
 ```
 
+
 ##understanding color in visualization
 ```{r colorPalette}
 # List the available colors
@@ -249,6 +256,7 @@ purple_orange <- purple_orange[-(1:2)]
 ```
 
 ##Visualizing Corpus
+
 ### Combine Corpus
 Combine two corpus to see commonality
 ```{r combine Corpus}
@@ -324,6 +332,7 @@ pyramid.plot(top25_df$x, top25_df$y
   )
 ```
 
+###Word Associations
 ```{r wordAssociation , message = FALSE}
 # Word association
 word_associate(coffee_tweets, match.string = c("barista"), 
@@ -334,9 +343,10 @@ word_associate(coffee_tweets, match.string = c("barista"),
 title(main = "Barista Coffee Tweet Associations")
 ```
 
-##additional skills for improving text mining
 
-###understanding hclusts and dendrograms
+#additional skills for improving text mining
+
+##understanding hclusts and dendrograms
 ```{r hclust}
 
 rain <- data.frame( "city" = as.factor(c("Portland", "Cleveland", "Boston", "New Orleans"))
@@ -356,10 +366,13 @@ hc <- hclust(dist_rain)
 plot(hc, labels = rain$city)
 ```
 
-###Cleaning up dendrograms by reducing Sparsity
+##Cleaning up dendrograms by reducing Sparsity
 Limit the number of words in your TDM using removeSparseTerms() from tm. 
 
 Why would you want to adjust the sparsity of the TDM/DTM?  TDMs and DTMs are sparse, meaning they contain mostly zeros. 
+```{r}
+
+```
 
 * A good TDM has between 25 and 70 terms. 
 * The lower the sparse value, the more terms are kept. The closer it is to 1, the fewer are kept. 
@@ -491,6 +504,30 @@ coffee_m_tdm[22, 5:60]
 tfidf_tdm_m[22, 5:60]
 ```
 
+```{r}
 
 
+
+# Choose the bing lexicon
+get_sentiments("bing")
+
+# Choose the nrc lexicon
+get_sentiments("nrc") %>%
+  count(sentiment) # Count words by sentiment
+```
+
+
+
+```{r SentimentLexicons}
+# Choose the bing lexicon
+get_sentiments("bing")
+
+# Choose the nrc lexicon
+get_sentiments("nrc") %>%
+  count(sentiment) # Count words by sentiment
+```
+
+```{r}
+
+```
 
